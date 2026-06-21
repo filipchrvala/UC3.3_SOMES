@@ -71,6 +71,30 @@ Set these CI/CD variables in GitLab (Settings → CI/CD → Variables). Mark sec
 | `CONTAINER_REGISTRY` | `harbor.testbed.spice-platform.eu` |
 | `CONTAINER_REGISTRY_USERNAME` | Harbor user/robot (e.g. `partner`) |
 | `CONTAINER_REGISTRY_PASSWORD` | Harbor password from vault |
-| `ONEDATA_ACCESS_TOKEN` | Only if onedata tests are added later |
+| `ONEDATA_ACCESS_TOKEN` | OneData access token; consumed by the `-k onedata` pytest step |
 
 `config.toml` `REGISTRY_NAME` must use namespace `harbor.testbed.spice-platform.eu/partner/uc3`.
+
+## OneData integration (optional, opt-in)
+
+The boundary pieces can read inputs from / publish outputs to the SPICE OneData
+store via `fsspec` + `onedatarestfsspec`. The integration is **fully backward
+compatible**: with no OneData secrets and local paths, every piece behaves
+exactly as before.
+
+- **Shared layer:** `pieces/common/onedata_io.py` routes `onedata:///...` paths
+  through fsspec and local paths through pathlib/pandas (unchanged).
+- **Wired pieces:**
+  - `FetchEnergyDataPiece` – reads `load_csv` / `prices_csv` (local or `onedata:///...`).
+  - `SustainableIngestPiece` – reads/persists history + archives drops (local or `onedata:///...`).
+  - `DashboardPiece` – optional `publish_to` (`onedata:///...`) also copies the final dashboard JSON to OneData.
+- **Secrets:** each wired piece declares an optional `SecretsModel`
+  (`onedata_onezone_host`, `onedata_token`). In Domino, configure them as piece
+  secrets; locally they are unset, so the local filesystem is used. The token is
+  never stored in code or `config.toml`.
+- **Tests:** `tests/test_fetch_piece_onedata.py` runs a real OneData round-trip;
+  it is selected by `pytest -k onedata` and auto-skips unless
+  `ONEDATA_ONEZONE_HOST` + `ONEDATA_TOKEN` are set. Local fallback coverage lives
+  in `tests/test_io_layer_local.py` (runs in the normal job).
+
+Onezone host: `data.spice-platform.eu`.
