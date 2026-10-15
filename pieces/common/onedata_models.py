@@ -33,7 +33,7 @@ class OneDataSecretsModel(BaseModel):
     )
     onedata_output_dir: Optional[str] = Field(
         default=DEFAULT_OUTPUT_DIR,
-        description="OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+        description="OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
     )
 
 

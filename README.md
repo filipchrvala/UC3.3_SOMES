@@ -3,7 +3,7 @@
 Domino piece repository for **UC3.3 SOMES** (sustainable energy workflow: OneData I/O, MRK/PV/battery simulation, investment KPIs, dashboard).
 
 - SPICE GitLab: [use-cases/uc3/UC3.3_SOMES](https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES)
-- SPICE Harbor: `harbor.testbed.spice-platform.eu/partner/uc3/uc3_3_somes:0.1.35-group0`
+- SPICE Harbor: `harbor.testbed.spice-platform.eu/partner/uc3/uc3_3_somes:0.1.36-group0`
 - Workflow import pack: [workflows/UC3.3_SOMES](https://gitlab.spice-platform.eu/use-cases/uc3/workflows/-/tree/main/UC3.3_SOMES)
 
 ## Repository layout (production)

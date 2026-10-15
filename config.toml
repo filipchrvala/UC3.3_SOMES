@@ -2,4 +2,4 @@
 REGISTRY_NAME = "harbor.testbed.spice-platform.eu/partner/uc3"
 REPOSITORY_NAME = "uc3_3_somes"
 REPOSITORY_LABEL = "UC3.3 SOMES"
-VERSION = "0.1.35"
+VERSION = "0.1.36"

@@ -95,8 +95,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -223,8 +223,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -391,8 +391,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -561,8 +561,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -687,8 +687,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -798,8 +798,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -936,8 +936,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -1082,8 +1082,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -1204,8 +1204,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -1321,8 +1321,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -1446,8 +1446,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -1568,8 +1568,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -1707,8 +1707,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -1844,8 +1844,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -1972,8 +1972,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -2131,8 +2131,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -2243,8 +2243,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -2395,8 +2395,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -2539,8 +2539,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -2672,8 +2672,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -2808,8 +2808,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -2941,8 +2941,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
@@ -3058,8 +3058,8 @@
                             "type": "null"
                         }
                     ],
-                    "default": "onedata:///FilipsSpace/sustainable_model/outputs",
-                    "description": "OneData base dir for run outputs, e.g. onedata:///FilipsSpace/sustainable_model/outputs",
+                    "default": "onedata:///SCDI/UC3.3_SOMES/outputs",
+                    "description": "OneData base dir for run outputs, e.g. onedata:///SCDI/UC3.3_SOMES/outputs",
                     "title": "Onedata Output Dir"
                 }
             },
