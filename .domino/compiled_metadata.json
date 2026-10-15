@@ -103,7 +103,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/KPIPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/KPIPiece"
     },
     "TrainModelPiece": {
         "name": "TrainModelPiece",
@@ -231,7 +231,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/TrainModelPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/TrainModelPiece"
     },
     "FeasibilityReportPiece": {
         "name": "FeasibilityReportPiece",
@@ -399,7 +399,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/FeasibilityReportPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/FeasibilityReportPiece"
     },
     "SimulatePiece": {
         "name": "SimulatePiece",
@@ -569,7 +569,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/SimulatePiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/SimulatePiece"
     },
     "CatalogSyncPiece": {
         "name": "CatalogSyncPiece",
@@ -695,7 +695,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/CatalogSyncPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/CatalogSyncPiece"
     },
     "ModelMonitoringPiece": {
         "name": "ModelMonitoringPiece",
@@ -806,7 +806,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/ModelMonitoringPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/ModelMonitoringPiece"
     },
     "IncrementalTrainPiece": {
         "name": "IncrementalTrainPiece",
@@ -944,7 +944,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/IncrementalTrainPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/IncrementalTrainPiece"
     },
     "PredictPiece": {
         "name": "PredictPiece",
@@ -1090,7 +1090,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/PredictPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/PredictPiece"
     },
     "BatteryStrategyOptimizerPiece": {
         "name": "BatteryStrategyOptimizerPiece",
@@ -1212,7 +1212,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/BatteryStrategyOptimizerPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/BatteryStrategyOptimizerPiece"
     },
     "InvestmentEvalPiece": {
         "name": "InvestmentEvalPiece",
@@ -1329,7 +1329,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/InvestmentEvalPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/InvestmentEvalPiece"
     },
     "ForecastHorizonPiece": {
         "name": "ForecastHorizonPiece",
@@ -1454,7 +1454,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/ForecastHorizonPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/ForecastHorizonPiece"
     },
     "SolarSimPiece": {
         "name": "SolarSimPiece",
@@ -1576,7 +1576,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/SolarSimPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/SolarSimPiece"
     },
     "WebUserInputPiece": {
         "name": "WebUserInputPiece",
@@ -1715,7 +1715,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/WebUserInputPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/WebUserInputPiece"
     },
     "PreprocessEnergyDataPiece": {
         "name": "PreprocessEnergyDataPiece",
@@ -1852,7 +1852,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/PreprocessEnergyDataPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/PreprocessEnergyDataPiece"
     },
     "FetchEnergyDataPiece": {
         "name": "FetchEnergyDataPiece",
@@ -1980,7 +1980,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/FetchEnergyDataPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/FetchEnergyDataPiece"
     },
     "AnomalyAlertPiece": {
         "name": "AnomalyAlertPiece",
@@ -2139,7 +2139,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/AnomalyAlertPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/AnomalyAlertPiece"
     },
     "CatalogRankerPiece": {
         "name": "CatalogRankerPiece",
@@ -2251,7 +2251,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/CatalogRankerPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/CatalogRankerPiece"
     },
     "DashboardPiece": {
         "name": "DashboardPiece",
@@ -2403,7 +2403,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/DashboardPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/DashboardPiece"
     },
     "SustainableIngestPiece": {
         "name": "SustainableIngestPiece",
@@ -2547,7 +2547,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/SustainableIngestPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/SustainableIngestPiece"
     },
     "UserInputPiece": {
         "name": "UserInputPiece",
@@ -2680,7 +2680,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/UserInputPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/UserInputPiece"
     },
     "SizingOptimizationPiece": {
         "name": "SizingOptimizationPiece",
@@ -2816,7 +2816,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/SizingOptimizationPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/SizingOptimizationPiece"
     },
     "BatterySimPiece": {
         "name": "BatterySimPiece",
@@ -2949,7 +2949,7 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/BatterySimPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/BatterySimPiece"
     },
     "TechnicalLimitsPiece": {
         "name": "TechnicalLimitsPiece",
@@ -3066,6 +3066,6 @@
             "title": "SecretsModel",
             "type": "object"
         },
-        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_Industry_Sg_Vre_Sustainable_Model/tree/main/pieces/TechnicalLimitsPiece"
+        "source_url": "https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES/tree/main/pieces/TechnicalLimitsPiece"
     }
 }
