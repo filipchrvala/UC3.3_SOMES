@@ -1,4 +1,22 @@
-# Sustainable Model Domino Workflow
+# UC3.3 SoMES — Domino pieces (SPICE / GitLab)
+
+Operational next-day microgrid optimisation. Same code line as GitHub
+`scditech/uc3_3_somes`. Version **0.3.0**.
+
+**Import on SPICE:** `uc33_somes.spice.customization`
+(Harbor image `harbor.testbed.spice-platform.eu/partner/uc3/uc3_3_somes:0.3.0-group0`).
+Plain OneData import: `uc33_somes.customization`.
+
+**FVE / battery / site:** edit `onedata:///SCDI/UC3.3_SOMES/inputs/scenario.yaml`
+(`pv.installed_kwp`, `battery.energy_kwh`, `site.latitude` / `longitude`, `grid.*`).
+No form piece. OneData token is a Domino secret, not in code.
+
+Push to `dev` runs `run-tests-dev` (Harbor `development` tag). Push to `main`
+(when `config.toml` changes) publishes the versioned Harbor image.
+
+---
+
+# Sustainable Model Domino Workflow (legacy local scripts)
 
 Workflow combines:
 
