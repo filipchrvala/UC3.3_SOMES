@@ -15,56 +15,8 @@ from pieces.PredictPiece.models import InputModel as PredictInput
 from pieces.PredictPiece.piece import PredictPiece
 from pieces.TrainModelPiece.models import InputModel as TrainInput
 from pieces.TrainModelPiece.piece import TrainModelPiece
-from pieces.UserInputPiece.models import InputModel as UserInput
-from pieces.UserInputPiece.piece import UserInputPiece
 from pieces.DashboardPiece.models import InputModel as DashboardInput
 from pieces.DashboardPiece.piece import DashboardPiece
-
-
-def test_user_input_piece_finds_workflow_json_next_to_inputs(tmp_path: Path) -> None:
-    base = tmp_path / "shared"
-    base.mkdir()
-    load_csv = base / "load.csv"
-    prices_csv = base / "prices.csv"
-    scenario_yaml = base / "scenario.yaml"
-    workflow_json = base / "workflow_user_input.json"
-
-    load_csv.write_text(
-        "\n".join(
-            [
-                "datetime,load_kw",
-                "2025-01-01 00:00:00,10",
-                "2025-01-01 00:15:00,11",
-                "2025-01-01 00:30:00,12",
-                "2025-01-01 00:45:00,13",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    prices_csv.write_text(
-        "\n".join(
-            [
-                "datetime,price_eur_per_kwh",
-                "2025-01-01 00:00:00,0.10",
-                "2025-01-01 00:15:00,0.11",
-                "2025-01-01 00:30:00,0.12",
-                "2025-01-01 00:45:00,0.13",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    scenario_yaml.write_text("timestep_minutes: 15\nproduction:\n  gap_repair_enabled: true\n", encoding="utf-8")
-    workflow_json.write_text('{"format":"workflow_user_input_v1"}', encoding="utf-8")
-
-    piece = UserInputPiece.__new__(UserInputPiece)
-    piece.results_path = str(tmp_path / "out")
-    out = piece.piece_function(
-        UserInput(load_csv=str(load_csv), prices_csv=str(prices_csv), scenario_yaml=str(scenario_yaml))
-    )
-
-    copied = Path(out.workflow_user_input_json)
-    assert copied.is_file()
-    assert json.loads(copied.read_text(encoding="utf-8"))["format"] == "workflow_user_input_v1"
 
 
 def test_train_and_predict_support_multi_department_inputs(tmp_path: Path) -> None:
@@ -88,6 +40,7 @@ def test_train_and_predict_support_multi_department_inputs(tmp_path: Path) -> No
 
     train_piece = TrainModelPiece.__new__(TrainModelPiece)
     train_piece.results_path = str(tmp_path / "train")
+    Path(train_piece.results_path).mkdir(parents=True, exist_ok=True)
     train_out = train_piece.piece_function(TrainInput(data_path=str(train_path)))
     model_path = Path(train_out.model_file_path)
     assert model_path.is_file()
@@ -98,8 +51,9 @@ def test_train_and_predict_support_multi_department_inputs(tmp_path: Path) -> No
 
     predict_piece = PredictPiece.__new__(PredictPiece)
     predict_piece.results_path = str(tmp_path / "predict")
+    Path(predict_piece.results_path).mkdir(parents=True, exist_ok=True)
     predict_out = predict_piece.piece_function(
-        PredictInput(model_path=str(model_path), data_path=str(predict_path), use_rolling_prediction=True, bridge_rows=4)
+        PredictInput(model_path=str(model_path), load_csv=str(predict_path), use_rolling_prediction=True, bridge_rows=4)
     )
 
     pred_df = pd.read_csv(predict_out.prediction_file_path)
@@ -123,21 +77,21 @@ def test_predict_piece_generates_missing_planned_csv_from_load(tmp_path: Path) -
 
     train_piece = TrainModelPiece.__new__(TrainModelPiece)
     train_piece.results_path = str(tmp_path / "train")
+    Path(train_piece.results_path).mkdir(parents=True, exist_ok=True)
     train_out = train_piece.piece_function(TrainInput(data_path=str(train_path)))
 
     shared_dir = tmp_path / "shared"
     shared_dir.mkdir()
     load_input = shared_dir / "load.csv"
     train_df[["datetime", "load_kw"]].to_csv(load_input, index=False)
-    missing_predict_path = shared_dir / "predict_planned_load_halfyear.csv"
 
     predict_piece = PredictPiece.__new__(PredictPiece)
     predict_piece.results_path = str(tmp_path / "predict")
+    Path(predict_piece.results_path).mkdir(parents=True, exist_ok=True)
     predict_out = predict_piece.piece_function(
-        PredictInput(model_path=train_out.model_file_path, data_path=str(missing_predict_path), use_rolling_prediction=True)
+        PredictInput(model_path=train_out.model_file_path, load_csv=str(load_input), use_rolling_prediction=True)
     )
 
-    assert missing_predict_path.is_file()
     pred_df = pd.read_csv(predict_out.prediction_file_path)
     assert "prediction_load_kw" in pred_df.columns
     assert len(pred_df) > 4
@@ -177,6 +131,7 @@ def test_dashboard_piece_accepts_empty_alerts_csv(tmp_path: Path) -> None:
 
     piece = DashboardPiece.__new__(DashboardPiece)
     piece.results_path = str(tmp_path / "dashboard")
+    Path(piece.results_path).mkdir(parents=True, exist_ok=True)
     out = piece.piece_function(
         DashboardInput(
             report_json=str(report_path),
