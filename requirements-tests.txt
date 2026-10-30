@@ -1,4 +1,4 @@
 pytest==7.4.3
 pytest-cov==4.1.0
 
--r dependencies/requirements.txt
+-r dependencies/requirements_0.txt

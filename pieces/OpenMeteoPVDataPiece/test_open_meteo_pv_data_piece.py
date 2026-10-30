@@ -3,7 +3,13 @@ import json
 import os
 from pathlib import Path
 
+import pytest
 from domino.testing import piece_dry_run
+
+pytest.skip(
+    "piece_dry_run needs a live Domino HTTP+Docker sidecar; GitLab/GitHub CI run unit tests in tests/ instead",
+    allow_module_level=True,
+)
 
 
 def test_open_meteo_json_output():
