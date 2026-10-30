@@ -1,43 +1,34 @@
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
+try:
+    from common.onedata_models import OneDataSecretsModel, RunIdInputMixin
+except ModuleNotFoundError:
+    from pieces.common.onedata_models import OneDataSecretsModel, RunIdInputMixin
 
-class InputModel(BaseModel):
+
+
+class InputModel(RunIdInputMixin):
     """
     Input model for Fetch Energy Data Piece
     """
 
     load_csv: str = Field(
         default="/home/shared_storage/load.csv",
-        description="Path to load CSV file or a directory with load*.csv files. "
-                    "May be a local path or an 'onedata:///space/...' URL."
+        description="Path to load CSV file or a directory with load*.csv files"
     )
 
     prices_csv: str = Field(
         default="/home/shared_storage/prices.csv",
-        description="Path to prices CSV file (local path or 'onedata:///...' URL)."
+        description="Path to prices CSV file"
     )
 
 
-class SecretsModel(BaseModel):
-    """
-    Optional OneData credentials. When both are provided, input paths using the
-    'onedata:///...' scheme are read from the SPICE OneData store. When absent,
-    the piece reads from the local filesystem exactly as before.
-    """
-
-    onedata_onezone_host: Optional[str] = Field(
-        default=None,
-        description="Onedata Onezone host, e.g. data.spice-platform.eu"
-    )
-    onedata_token: Optional[str] = Field(
-        default=None,
-        description="Onedata access token."
-    )
+class SecretsModel(OneDataSecretsModel):
+    pass
 
 
 class OutputModel(BaseModel):
+    run_id: str = Field(default="", description="OneData run folder id")
     """
     Output model for Fetch Energy Data Piece
     """

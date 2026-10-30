@@ -1,18 +1,30 @@
 from __future__ import annotations
 
 import importlib
+import json
 from pathlib import Path
 import sys
 import traceback
 
+import numpy as np
 import pandas as pd
 import yaml
+
 try:
     from domino.base_piece import BasePiece
 except ModuleNotFoundError:
     from local_compat.base_piece import BasePiece
 
 from .models import InputModel, OutputModel
+
+try:
+    from common import onedata_io as od
+except ModuleNotFoundError:
+    try:
+        from pieces.common import onedata_io as od
+    except ModuleNotFoundError:
+        od = None
+
 
 
 def _load_simulate_module():
@@ -23,15 +35,30 @@ def _load_simulate_module():
 
 
 class BatterySimPiece(BasePiece):
-    """Generate battery SOC profile using dispatch model."""
+    """SoMES battery charge/discharge plan + SOC trajectory for the optimisation horizon."""
 
-    def piece_function(self, input_data: InputModel) -> OutputModel:
+    def piece_function(self, input_data: InputModel, secrets_data=None) -> OutputModel:
+        _stage = None
+        _run_id = None
+        if od is not None:
+            input_data, _stage = od.stage_inputs(input_data, secrets_data)
+            _run_id = od.resolve_run_id(
+                input_data, secrets_data, generate=False, results_path=getattr(self, "results_path", None)
+            )
+            if hasattr(input_data, "run_id") and _run_id and not getattr(input_data, "run_id", ""):
+                try:
+                    input_data.run_id = _run_id
+                except Exception:
+                    pass
         csv_path = Path(input_data.load_csv)
         scenario_path = Path(input_data.scenario_yaml)
         solar_path = Path(input_data.virtual_solar_csv)
         out_dir = Path(self.results_path or scenario_path.parent)
         out_dir.mkdir(parents=True, exist_ok=True)
         log_path = out_dir / "battery_sim.log"
+        repo_root = Path(__file__).resolve().parents[2]
+        if str(repo_root) not in sys.path:
+            sys.path.insert(0, str(repo_root))
 
         def _log(msg: str) -> None:
             text = f"[BatterySimPiece] {msg}"
@@ -50,6 +77,14 @@ class BatterySimPiece(BasePiece):
             raise FileNotFoundError(f"Virtual solar CSV not found: {solar_path}")
 
         try:
+            from pieces.common_somes.architecture import (
+                build_technical_validation_bundle,
+                operational_kpis_from_dispatch,
+                write_json,
+            )
+            from pieces.common_somes.connectors import load_grid_constraints, read_bess_state
+            from pieces.common_somes.dispatch import plan_dispatch, plans_to_frames
+
             sim = _load_simulate_module()
             cfg = yaml.safe_load(scenario_path.read_text(encoding="utf-8")) or {}
             df = sim.load_consumption_csv(csv_path)
@@ -59,53 +94,217 @@ class BatterySimPiece(BasePiece):
 
             dt_h = sim.infer_timestep_hours(df)
             price = sim.build_price_series(df, cfg).values.astype(float)
-            net = df["load_kw"].astype(float).values - solar_df["pv_kw"].astype(float).values
+            if input_data.price_forecast_csv and Path(input_data.price_forecast_csv).is_file():
+                pfc = pd.read_csv(input_data.price_forecast_csv, parse_dates=["datetime"])
+                col = "price_eur_kwh_forecast" if "price_eur_kwh_forecast" in pfc.columns else "price_eur_kwh"
+                merged = df[["datetime"]].merge(pfc[["datetime", col]], on="datetime", how="left")
+                alt = pd.to_numeric(merged[col], errors="coerce")
+                if alt.notna().any():
+                    price = alt.fillna(pd.Series(price)).to_numpy(dtype=float)
+                    _log("Using price forecast series")
 
             bat = cfg.get("battery") or {}
-            mrk = cfg.get("mrk") or {}
-            en = cfg.get("energy") or {}
-            _g, soc, _pb, _exp = sim.dispatch_battery(
-                net_load_kw=net,
+            charge_below = 0.08
+            discharge_above = 0.15
+            candidates = []
+            if input_data.battery_strategy_json:
+                candidates.append(Path(input_data.battery_strategy_json))
+            candidates.extend(
+                [
+                    repo_root / "tests" / "BatteryStrategyOptimizerPiece_Outputs" / "battery_strategy_recommendation.json",
+                    out_dir.parent / "BatteryStrategyOptimizerPiece_Outputs" / "battery_strategy_recommendation.json",
+                ]
+            )
+            for candidate in candidates:
+                if candidate.is_file():
+                    rec = json.loads(candidate.read_text(encoding="utf-8"))
+                    charge_below = float(rec.get("charge_below_eur_per_kwh", charge_below))
+                    discharge_above = float(rec.get("discharge_above_eur_per_kwh", discharge_above))
+                    _log(f"Loaded strategy thresholds from {candidate}")
+                    break
+
+            grid = load_grid_constraints(
+                Path(input_data.grid_constraints_json) if input_data.grid_constraints_json else None,
+                cfg,
+            )
+            # P4/G05: zachovať explicitnú 0 (zákaz exportu/importu); None = bez limitu.
+            _imp = grid.get("import_limit_kw")
+            import_limit = float(_imp) if _imp is not None else None
+            _exp = grid.get("export_limit_kw")
+            export_limit = float(_exp) if _exp is not None else None
+
+            load_kw = df["load_kw"].astype(float).values.copy()
+            if input_data.flexible_load_schedule_csv and Path(input_data.flexible_load_schedule_csv).is_file():
+                flex = pd.read_csv(input_data.flexible_load_schedule_csv, parse_dates=["datetime"])
+                if "flexible_load_kw" in flex.columns:
+                    flex = flex.drop_duplicates(subset=["datetime"], keep="last")
+                    merged = df[["datetime"]].merge(flex[["datetime", "flexible_load_kw"]], on="datetime", how="left")
+                    add = pd.to_numeric(merged["flexible_load_kw"], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+                    if len(add) != len(load_kw):
+                        add = np.resize(add, len(load_kw))
+                    load_kw = load_kw + add
+                    _log(f"Applied flexible load schedule, extra energy={float(add.sum() * dt_h):.2f} kWh")
+
+            # P1/G21: priraď FV predpoveď podľa času (datetime merge), nie podľa
+            # poradia riadkov — inak sa do plánu dostane nesprávny úsek profilu
+            # (napr. 1.1. namiesto plánovaného dňa).
+            if "datetime" in solar_df.columns:
+                _sol = solar_df.copy()
+                _sol["datetime"] = pd.to_datetime(_sol["datetime"], errors="coerce")
+                _merged_pv = df[["datetime"]].merge(
+                    _sol[["datetime", "pv_kw"]].drop_duplicates(subset=["datetime"], keep="last"),
+                    on="datetime",
+                    how="left",
+                )
+                _missing = int(_merged_pv["pv_kw"].isna().sum())
+                pv_kw = pd.to_numeric(_merged_pv["pv_kw"], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+                if _missing:
+                    _log(
+                        f"PV forecast chýba pre {_missing}/{len(df)} krokov plánu — "
+                        f"doplnené 0 kW (over časové zarovnanie FV)"
+                    )
+            else:
+                pv_kw = solar_df["pv_kw"].astype(float).values[: len(df)]
+                if len(pv_kw) < len(df):
+                    pv_kw = np.pad(pv_kw, (0, len(df) - len(pv_kw)))
+                elif len(pv_kw) > len(df):
+                    pv_kw = pv_kw[: len(df)]
+
+            bess_state = read_bess_state(
+                Path(input_data.bess_telemetry_csv) if input_data.bess_telemetry_csv else None,
+                scenario_battery=bat,
+            )
+            state_path = write_json(out_dir / "bess_state.json", bess_state)
+            energy_kwh = float(bess_state["energy_kwh"]) or float(bat.get("energy_kwh", bat.get("capacity_kWh", 0.0)))
+            max_c_rate = float(bat.get("max_c_rate", 0.5))
+            pmax = energy_kwh * max_c_rate
+            max_charge_kw = min(pmax, float(bess_state["available_charge_kw"]) or pmax)
+            max_discharge_kw = min(pmax, float(bess_state["available_discharge_kw"]) or pmax)
+            _log(
+                f"BESS state source={bess_state['source']} soc={bess_state['initial_soc_pct']:.1f}% "
+                f"charge<= {max_charge_kw:.1f} kW discharge<= {max_discharge_kw:.1f} kW"
+            )
+            for warn in bess_state.get("warnings", []):
+                _log(f"BESS warning: {warn}")
+
+            result = plan_dispatch(
+                method=str(input_data.dispatch_method or "auto"),
+                load_kw=load_kw,
+                pv_kw=pv_kw,
                 price=price,
                 dt_h=dt_h,
-                energy_kwh=float(bat.get("energy_kwh", 0.0)),
-                max_c_rate=float(bat.get("max_c_rate", 0.5)),
+                energy_kwh=energy_kwh,
+                max_c_rate=max_c_rate,
+                max_charge_kw=max_charge_kw,
+                max_discharge_kw=max_discharge_kw,
                 eta_c=float(bat.get("charge_efficiency", 0.95)),
                 eta_d=float(bat.get("discharge_efficiency", 0.95)),
-                initial_soc_pct=float(bat.get("initial_soc_pct", 50.0)),
-                mrk_contract_kw=float(mrk.get("contract_kw", 0.0)),
-                feed_in_eur_per_kwh=float(en.get("feed_in_surplus_eur_per_kwh", 0.05)),
-                pv_lcoe_eur_per_kwh=0.12,
-                battery_throughput_eur_per_kwh=0.02,
-                max_fraction_from_grid_charge=float(bat.get("max_fraction_capacity_from_grid_charge", 0.72)),
+                initial_soc_pct=float(bess_state["initial_soc_pct"]),
+                soc_min_pct=float(bess_state["soc_min_pct"]),
+                soc_max_pct=float(bess_state["soc_max_pct"]),
+                charge_below=charge_below,
+                discharge_above=discharge_above,
+                import_limit_kw=import_limit,
+                export_limit_kw=export_limit,
+                export_price=float(input_data.export_price_eur_kwh),
+                degradation_cost_eur_kwh=float(input_data.degradation_cost_eur_kwh),
+                peak_price_eur_kw=float(input_data.peak_price_eur_kw),
+                terminal_soc_pct=(
+                    float(input_data.terminal_soc_pct) if float(input_data.terminal_soc_pct) >= 0 else None
+                ),
             )
-            out_df = pd.DataFrame({"datetime": df["datetime"], "soc_pct": soc})
-            cycles = float(sim.equivalent_full_cycles(pd.Series(soc)))
-            throughput_mwh = float(
-                (pd.Series(soc).diff().abs().fillna(0.0).sum() / 100.0) * float(bat.get("energy_kwh", 0.0)) / 1000.0
-            )
-            summary_df = pd.DataFrame(
+            method_used = str(result.get("method", "greedy_threshold"))
+            if result.get("fallback_reason"):
+                _log(f"Dispatch fell back to {method_used}: {result['fallback_reason']}")
+            else:
+                _log(f"Dispatch engine={method_used} objective={result.get('objective_eur')} EUR")
+            frames = plans_to_frames(df["datetime"], result)
+            soc_df = pd.DataFrame({"datetime": df["datetime"], "soc_pct": result["soc_pct"]})
+            summary = pd.DataFrame(
                 [
                     {
-                        "capacity_kWh": float(bat.get("energy_kwh", 0.0)),
-                        "cycles_equivalent": round(cycles, 4),
-                        "energy_throughput_MWh": round(throughput_mwh, 4),
+                        "energy_kwh": energy_kwh,
+                        "max_c_rate": max_c_rate,
+                        "mean_soc_pct": float(soc_df["soc_pct"].mean()),
+                        "min_soc_pct": float(soc_df["soc_pct"].min()),
+                        "max_soc_pct": float(soc_df["soc_pct"].max()),
+                        "charge_kwh": float(frames["battery_charge_discharge_plan"]["charge_kw"].sum() * dt_h),
+                        "discharge_kwh": float(frames["battery_charge_discharge_plan"]["discharge_kw"].sum() * dt_h),
+                        "grid_import_kwh": float(result["grid_import_kw"].sum() * dt_h),
+                        "grid_export_kwh": float(result["grid_export_kw"].sum() * dt_h),
+                        "n_constraint_violations": int(result["n_violations"]),
+                        "dispatch_method": method_used,
+                        "objective_eur": result.get("objective_eur"),
+                        "initial_soc_source": bess_state["source"],
+                        "mode": "somes_operational_dispatch",
                     }
                 ]
             )
-            _log(f"Computed battery SOC rows={len(out_df)}")
+            for name, frame in frames.items():
+                frame.to_csv(out_dir / f"{name}.csv", index=False)
+
+            dispatch = frames["next_day_dispatch_plan"]
+            validation = build_technical_validation_bundle(
+                dispatch,
+                energy_kwh=energy_kwh,
+                max_c_rate=max_c_rate,
+                grid=grid,
+            )
+            validation["dispatch_runtime_violations"] = result["violations"]
+            validation["dispatch_engine"] = {
+                "method": method_used,
+                "objective_eur": result.get("objective_eur"),
+                "fallback_reason": result.get("fallback_reason"),
+                "bess_state": bess_state,
+            }
+            tech_path = write_json(out_dir / "technical_validation.json", validation)
+            forecast_accuracy = {}
+            if input_data.forecast_accuracy_json and Path(input_data.forecast_accuracy_json).is_file():
+                forecast_accuracy = json.loads(
+                    Path(input_data.forecast_accuracy_json).read_text(encoding="utf-8")
+                )
+            kpis = operational_kpis_from_dispatch(
+                dispatch,
+                dt_h=dt_h,
+                price=price,
+                pv_kw=pv_kw,
+                load_kw=load_kw,
+                export_price_eur_kwh=float(input_data.export_price_eur_kwh),
+                forecast_accuracy=forecast_accuracy,
+            )
+            kpi_path = write_json(out_dir / "operational_kpis.json", kpis)
+            _log(f"Operational battery plan rows={len(soc_df)} approved={validation['overall_ok']}")
         except Exception as exc:
             (out_dir / "battery_sim_error.txt").write_text(traceback.format_exc(), encoding="utf-8")
-            _log(f"ERROR during battery simulation: {exc}")
+            _log(f"ERROR during battery operational plan: {exc}")
             raise
 
-        out_csv = out_dir / "virtual_battery_soc.csv"
-        summary_csv = out_dir / "battery_summary.csv"
-        out_df.to_csv(out_csv, index=False)
-        summary_df.to_csv(summary_csv, index=False)
-        _log(f"Wrote outputs: {out_csv}, {summary_csv}")
-        return OutputModel(
-            message="Battery simulation finished",
-            virtual_battery_soc_csv=str(out_csv),
-            battery_summary_csv=str(summary_csv),
+        out_soc = out_dir / "virtual_battery_soc.csv"
+        out_sum = out_dir / "battery_summary.csv"
+        soc_df.to_csv(out_soc, index=False)
+        summary.to_csv(out_sum, index=False)
+        _log(f"Wrote outputs: {out_soc}, {out_sum}")
+        _piece_out = OutputModel(
+            message="SoMES battery charge/discharge plan finished",
+            virtual_battery_soc_csv=str(out_soc),
+            battery_summary_csv=str(out_sum),
+            battery_charge_discharge_plan_csv=str(out_dir / "battery_charge_discharge_plan.csv"),
+            grid_import_export_plan_csv=str(out_dir / "grid_import_export_plan.csv"),
+            next_day_dispatch_plan_csv=str(out_dir / "next_day_dispatch_plan.csv"),
+            technical_validation_json=str(tech_path),
+            operational_kpis_json=str(kpi_path),
+            dispatch_method_used=method_used,
+            bess_state_json=str(state_path),
         )
+        if od is not None:
+            if hasattr(_piece_out, 'run_id') and _run_id and not getattr(_piece_out, 'run_id', ''):
+                try:
+                    _piece_out.run_id = _run_id
+                except Exception:
+                    pass
+            return od.finish_piece(
+                _piece_out, self.results_path, secrets_data, "BatterySimPiece", _stage, run_id=_run_id
+            )
+        if _stage is not None:
+            _stage.cleanup()
+        return _piece_out
