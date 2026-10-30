@@ -29,56 +29,12 @@ jobs:
           python -m pip install -U pip
           pip install --no-cache-dir domino-py[cli]
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run organize and build images
-        run: |
-          domino piece organize --build-images --source-url=https://github.com/${{ github.repository }} --tag-overwrite=development
-
       - name: Install Tests Dependencies
         run: pip install -r requirements-tests.txt
 
-      - name: Run tests over built images
+      # Harbor/SPICE images are built by GitLab CI. On GitHub this repo's
+      # config.toml points at Harbor, so ghcr.io + harbor path dry-runs fail.
+      # Unit tests only (tests/, not pieces/*/test_* piece_dry_run).
+      - name: Run unit tests
         run: |
-          pytest --cov=pieces --cov-report=xml --cov-report=term-missing
-
-      - name: Publish images
-        env:
-          GHCR_USERNAME: ${{ github.actor }}
-        run: domino piece publish-images --registry-token ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Commit files
-        id: commit_files
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          GIT_STATUS=$(git status -s)
-          if [[ ! -z "$GIT_STATUS" ]]; then
-            git add .domino/* && git commit -m "auto-organize" -a
-            echo "commit_sha=$(git rev-parse HEAD)" >> $GITHUB_ENV
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "No changes to commit"
-            echo "commit_sha=${{ github.sha }}" >> $GITHUB_ENV
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Push changes
-        if: steps.commit_files.outputs.has_changes == 'true'
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.REPO_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
-
-      - name: Create Release
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          domino piece delete-release --tag-name=development
-          domino piece release --tag-name=development --commit-sha=$commit_sha
+          pytest tests/ --cov=pieces --cov-report=xml --cov-report=term-missing
