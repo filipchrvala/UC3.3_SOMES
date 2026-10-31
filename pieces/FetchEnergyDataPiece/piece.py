@@ -3,14 +3,7 @@ try:
 except ModuleNotFoundError:
     from local_compat.base_piece import BasePiece
 from .models import InputModel, OutputModel
-import os
-import pandas as pd
-from pathlib import Path
-import traceback
 
-# Shared OneData I/O layer. Import works both in Domino (pieces dir on path)
-# and in local runs (repo root on path). Falls back to local-only stubs if the
-# module is somehow unavailable, so the piece never fails to import.
 try:
     from common import onedata_io as od
 except ModuleNotFoundError:
@@ -19,29 +12,9 @@ except ModuleNotFoundError:
     except ModuleNotFoundError:
         od = None
 
-
-def _stem(path: str) -> str:
-    return os.path.splitext(os.path.basename(str(path)))[0]
-
-
-# Thin I/O wrappers: use the shared OneData layer when present (it routes local
-# paths to pathlib/pandas unchanged), else fall back to plain local behaviour.
-def _io_isfile(path: str) -> bool:
-    return od.isfile(path) if od is not None else Path(path).is_file()
-
-
-def _io_isdir(path: str) -> bool:
-    return od.isdir(path) if od is not None else Path(path).is_dir()
-
-
-def _io_glob(directory: str, pattern: str) -> list[str]:
-    if od is not None:
-        return od.glob(directory, pattern)
-    return sorted(str(p) for p in Path(directory).glob(pattern))
-
-
-def _io_read_csv(path: str, **kwargs) -> pd.DataFrame:
-    return od.read_csv(path, **kwargs) if od is not None else pd.read_csv(path, **kwargs)
+import pandas as pd
+from pathlib import Path
+import traceback
 
 
 def _to_numeric_series(s: pd.Series) -> pd.Series:
@@ -57,23 +30,42 @@ def _pick_datetime_column(df: pd.DataFrame) -> str | None:
     return None
 
 
+def _parse_datetimes(values: pd.Series) -> pd.Series:
+    """Parse timestamps ISO-first.
+
+    Falling straight through to ``dayfirst=True`` silently rewrites ISO dates
+    such as 2025-11-01 into 11 January, which shreds the timeline and shows up
+    only later as enormous gaps in the data-quality report.
+    """
+    text = values.astype(str).str.strip()
+    iso = pd.to_datetime(text, format="ISO8601", errors="coerce")
+    if iso.notna().any():
+        return iso
+    european = pd.to_datetime(text, format="%d.%m.%y %H:%M", errors="coerce")
+    if european.notna().any():
+        return european
+    return pd.to_datetime(text, dayfirst=True, errors="coerce")
+
+
 def _normalize_load_frame(raw: pd.DataFrame, source_name: str) -> pd.DataFrame:
     dt_col = _pick_datetime_column(raw)
     if dt_col is None:
         raise ValueError(f"{source_name}: missing datetime column")
 
     df = raw.copy()
-    dt_raw = df[dt_col].astype(str).str.strip()
-    dt = pd.to_datetime(dt_raw, format="%d.%m.%y %H:%M", errors="coerce")
-    if dt.isna().all():
-        dt = pd.to_datetime(dt_raw, dayfirst=True, errors="coerce")
-    df["datetime"] = dt
+    df["datetime"] = _parse_datetimes(df[dt_col])
     df = df.dropna(subset=["datetime"])
     if dt_col != "datetime":
         df = df.drop(columns=[dt_col])
 
     if "load_kw" in df.columns:
-        df["load_kw"] = _to_numeric_series(df["load_kw"]).fillna(0.0)
+        # P8/GEN-E01-US06: chýbajúce hodnoty spotreby NENAHRÁDZAME nulou — necháme
+        # NaN a nahlásime ich (ďalej rieši data-quality krok). Tiché nulovanie by
+        # skreslilo spotrebu a porušuje princíp "no silent defaults".
+        df["load_kw"] = _to_numeric_series(df["load_kw"])
+        _missing = int(df["load_kw"].isna().sum())
+        if _missing:
+            print(f"[WARN] {source_name}: {_missing} chýbajúcich hodnôt load_kw ponechaných ako NaN (nenulované)")
         if "department_id" not in df.columns:
             dept = source_name.replace("load_", "") or "default"
             df["department_id"] = dept if dept != "load" else "default"
@@ -91,7 +83,11 @@ def _normalize_load_frame(raw: pd.DataFrame, source_name: str) -> pd.DataFrame:
         value_name="load_kw",
     )
     long["department_id"] = long["department_id"].astype(str).str.strip().str.replace("prikon ", "", case=False)
-    long["load_kw"] = _to_numeric_series(long["load_kw"]).fillna(0.0)
+    # P8/GEN-E01-US06: nenulovať chýbajúce hodnoty — ponechať NaN a nahlásiť.
+    long["load_kw"] = _to_numeric_series(long["load_kw"])
+    _missing = int(long["load_kw"].isna().sum())
+    if _missing:
+        print(f"[WARN] {source_name}: {_missing} chýbajúcich hodnôt load_kw ponechaných ako NaN (nenulované)")
     return long[["datetime", "department_id", "load_kw"]]
 
 
@@ -112,49 +108,55 @@ class FetchEnergyDataPiece(BasePiece):
 
     def piece_function(self, input_data: InputModel, secrets_data=None) -> OutputModel:
         _stage = None
-        _piece_out = None
         _run_id = None
         if od is not None:
             input_data, _stage = od.stage_inputs(input_data, secrets_data)
-            _run_id = od.resolve_run_id(input_data, secrets_data, generate=True)
+            _run_id = od.resolve_run_id(
+                input_data, secrets_data, generate=True, results_path=getattr(self, "results_path", None)
+            )
+            if hasattr(input_data, "run_id") and _run_id and not getattr(input_data, "run_id", ""):
+                try:
+                    input_data.run_id = _run_id
+                except Exception:
+                    pass
         try:
             _log(self.results_path, "[INFO] FetchEnergyDataPiece started")
             _log(self.results_path, f"[INFO] Load CSV: {input_data.load_csv}")
             _log(self.results_path, f"[INFO] Prices CSV: {input_data.prices_csv}")
 
-            if od is not None and od.onedata_configured():
-                _log(self.results_path, "[INFO] OneData backend configured for inputs")
-
-            load_csv = str(input_data.load_csv)
-            prices_csv = str(input_data.prices_csv or "")
+            load_csv = Path(input_data.load_csv)
+            prices_csv = Path(input_data.prices_csv)
 
             prices_df = pd.DataFrame()
-            if prices_csv and _io_isfile(prices_csv):
-                prices_df = _io_read_csv(prices_csv, parse_dates=["datetime"])
+            if prices_csv and prices_csv.is_file():
+                prices_df = pd.read_csv(prices_csv, parse_dates=["datetime"])
                 prices_df = prices_df.set_index("datetime")
             else:
                 _log(self.results_path, "[WARN] Prices CSV not found; continuing without price columns")
 
-            if _io_isdir(load_csv):
-                load_files = _io_glob(load_csv, "load*.csv")
+            if load_csv.is_dir():
+                load_files = sorted(load_csv.glob("load*.csv"))
                 if not load_files:
-                    load_files = [p for p in _io_glob(load_csv, "*.csv") if "price" not in os.path.basename(p).lower()]
-            elif _io_isfile(load_csv):
+                    load_files = [p for p in sorted(load_csv.glob("*.csv")) if "price" not in p.name.lower()]
+            elif load_csv.is_file():
                 load_files = [load_csv]
             else:
                 load_files = []
             if not load_files:
                 message = f"No load CSV files found at: {load_csv}"
                 _log(self.results_path, f"[ERROR] {message}")
-                return OutputModel(message=message, output_path="")
+                raise FileNotFoundError(
+                    f"{message}. Check Domino Settings → Storage Source = Local "
+                    "and that the path exists under /home/shared_storage."
+                )
 
             _log(self.results_path, "[INFO] Reading CSV files")
             merged_parts = []
             for lf in load_files:
-                raw = _io_read_csv(lf, sep=None, engine="python")
+                raw = pd.read_csv(lf, sep=None, engine="python")
                 if len(raw.columns) == 1 and ";" in str(raw.columns[0]):
-                    raw = _io_read_csv(lf, sep=";")
-                load_df = _normalize_load_frame(raw, _stem(lf)).set_index("datetime")
+                    raw = pd.read_csv(lf, sep=";")
+                load_df = _normalize_load_frame(raw, lf.stem).set_index("datetime")
                 if not prices_df.empty:
                     part = load_df.join(prices_df, how="left").reset_index()
                 else:
@@ -180,8 +182,19 @@ class FetchEnergyDataPiece(BasePiece):
             _piece_out = OutputModel(
                 message=f"Data merged successfully ({len(merged_df)} rows)",
                 output_path=str(output_path),
-                run_id=_run_id or "",
             )
+            if od is not None:
+                if hasattr(_piece_out, 'run_id') and _run_id and not getattr(_piece_out, 'run_id', ''):
+                    try:
+                        _piece_out.run_id = _run_id
+                    except Exception:
+                        pass
+                return od.finish_piece(
+                    _piece_out, self.results_path, secrets_data, "FetchEnergyDataPiece", _stage, run_id=_run_id
+                )
+            if _stage is not None:
+                _stage.cleanup()
+            return _piece_out
         except Exception:
             err = traceback.format_exc()
             _log(self.results_path, f"[ERROR] {err}")
@@ -189,11 +202,3 @@ class FetchEnergyDataPiece(BasePiece):
                 with open(Path(self.results_path) / "fetch_energy_data_error.txt", "w", encoding="utf-8") as f:
                     f.write(err)
             raise
-        finally:
-            if od is not None and _piece_out is None:
-                od.cleanup_on_error(self.results_path, secrets_data, "FetchEnergyDataPiece", _stage, run_id=_run_id)
-            elif _stage is not None:
-                _stage.cleanup()
-        if od is not None and _piece_out is not None:
-            return od.finish_piece(_piece_out, self.results_path, secrets_data, "FetchEnergyDataPiece", _stage, run_id=_run_id)
-        return _piece_out

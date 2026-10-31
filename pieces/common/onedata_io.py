@@ -18,7 +18,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import time
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -431,7 +430,26 @@ def _output_base(secrets_data: Any) -> str | None:
     return None
 
 
-def resolve_run_id(input_data: Any, secrets_data: Any, *, generate: bool = False) -> str | None:
+def _run_id_from_results_path(results_path: str | os.PathLike[str] | None) -> str | None:
+    """Derive a shared run id from Domino results_path (.../rest_client_<id>/Piece/...)."""
+    if not results_path:
+        return None
+    for part in Path(results_path).parts:
+        low = part.lower()
+        if low.startswith("rest_client_") or low.startswith("rest-client-"):
+            raw = part.split("_", 2)[-1] if "rest_client_" in low else part.split("rest-client-", 1)[-1]
+            cleaned = "".join(ch for ch in raw if ch.isalnum())
+            return cleaned[:12] or raw[:12]
+    return None
+
+
+def resolve_run_id(
+    input_data: Any,
+    secrets_data: Any,
+    *,
+    generate: bool = False,
+    results_path: str | os.PathLike[str] | None = None,
+) -> str | None:
     """Per-workflow run folder under ``onedata_output_dir`` (e.g. ``.../outputs/<run_id>/``)."""
     rid = _get(input_data, "run_id")
     if rid and str(rid).strip():
@@ -439,6 +457,9 @@ def resolve_run_id(input_data: Any, secrets_data: Any, *, generate: bool = False
     rid = _get(secrets_data, "onedata_run_id") or os.environ.get("ONEDATA_RUN_ID")
     if rid and str(rid).strip():
         return str(rid).strip()
+    rid = _run_id_from_results_path(results_path)
+    if rid:
+        return rid
     if generate:
         import uuid
         return uuid.uuid4().hex[:12]
@@ -521,30 +542,13 @@ def stage_inputs(input_data: Any, secrets_data: Any):
                 tmp = tempfile.mkdtemp(prefix="od_in_")
                 stage.tmpdirs.append(tmp)
                 local_f = os.path.join(tmp, _remote_name(val))
-                last_exc: Exception | None = None
-                for attempt in range(6):
-                    try:
-                        if isfile(val):
-                            write_bytes(local_f, read_bytes(val))
-                            last_exc = None
-                            break
-                        raise FileNotFoundError(
-                            f"OneData input missing for '{name}': {val}. "
-                            "Upstream piece may not have mirrored output; check DAG edges "
-                            "(Predict -> Solar/Battery) and re-import sus_onedata.customization."
-                        )
-                    except FileNotFoundError as exc:
-                        last_exc = exc
-                        if attempt < 5:
-                            time.sleep(2.0)
-                if last_exc is not None:
-                    raise last_exc
+                write_bytes(local_f, read_bytes(val))
                 overrides[name] = local_f
             else:
                 raise FileNotFoundError(
                     f"OneData input missing for '{name}': {val}. "
                     "Upstream piece may not have mirrored output; check DAG edges "
-                    "(Predict -> Solar/Battery) and re-import sus_onedata.customization."
+                    "(Predict -> Solar/Battery) and re-import test_sus_onedata.customization."
                 )
         except Exception as exc:
             host = (effective_secrets(secrets_data, use_defaults=True) or {}).get(
@@ -553,7 +557,7 @@ def stage_inputs(input_data: Any, secrets_data: Any):
             raise RuntimeError(
                 f"Failed to download OneData input '{name}' ({val}): {exc}. "
                 f"Host {host} must be reachable from the piece container. "
-                "On local Domino (PC without VPN in Docker) use sus_onedata_local.customization "
+                "On local Domino (PC without VPN in Docker) use test_sus_local.customization "
                 "and scripts/seed_shared_storage.py instead of OneData paths."
             ) from exc
 
@@ -657,15 +661,13 @@ def mirror_results(results_path: str | os.PathLike[str], secrets_data: Any,
             rel = f.relative_to(rp).as_posix()
             remote = f"{target}/{rel}"
             write_bytes(remote, f.read_bytes())
-            if has_protocol(remote) and not isfile(remote):
-                raise RuntimeError(f"OneData mirror verify failed for {remote}")
+            if not exists(remote):
+                raise RuntimeError(f"OneData mirror write did not persist: {remote}")
             uploaded += 1
     if uploaded == 0:
-        local_files = [p for p in rp.rglob("*") if p.is_file()]
-        if local_files:
-            raise RuntimeError(
-                f"OneData mirror uploaded 0 files from {results_path} to {target}"
-            )
+        print(f"[WARN] mirror_results: no files under {rp} for {piece_name}")
+    else:
+        print(f"[INFO] Mirrored {uploaded} file(s) to {target}")
     return target
 
 

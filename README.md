@@ -1,41 +1,86 @@
-# UC3.3_SOMES
+# UC3.3 SoMES — Domino pieces (SPICE / GitLab)
 
-Domino piece repository for **UC3.3 SOMES** (sustainable energy workflow: OneData I/O, MRK/PV/battery simulation, investment KPIs, dashboard).
+Operational next-day microgrid optimisation. Same code line as GitHub
+`scditech/uc3_3_somes`. Version **0.3.0**.
 
-- SPICE GitLab: [use-cases/uc3/UC3.3_SOMES](https://gitlab.spice-platform.eu/use-cases/uc3/UC3.3_SOMES)
-- SPICE Harbor: `harbor.testbed.spice-platform.eu/partner/uc3/uc3_3_somes:0.1.36-group0`
-- Workflow import pack: [workflows/UC3.3_SOMES](https://gitlab.spice-platform.eu/use-cases/uc3/workflows/-/tree/main/UC3.3_SOMES)
+**Import on SPICE:** `uc33_somes.spice.customization`
+(Harbor image `harbor.testbed.spice-platform.eu/partner/uc3/uc3_3_somes:0.3.0-group0`).
+Plain OneData import: `uc33_somes.customization`.
 
-## Repository layout (production)
+**FVE / battery / site:** edit `onedata:///SCDI/UC3.3_SOMES/inputs/scenario.yaml`
+(`pv.installed_kwp`, `battery.energy_kwh`, `site.latitude` / `longitude`, `grid.*`).
+No form piece. OneData token is a Domino secret, not in code.
 
-| Path | Purpose |
-|------|---------|
-| `pieces/` | Domino pieces and shared `common/` helpers |
-| `pieces/catalog/` | Default PV/battery catalog JSON (bundled in images) |
-| `dependencies/` | Container build (`Dockerfile`, `requirements.txt`) |
-| `config.toml` | Registry, version, repository metadata |
-| `.domino/` | Compiled piece metadata (updated by CI) |
-| `sus_onedata.customization` | **Import in Domino** (Workflows editor → Import) |
-| `sus_onedata.json` | GitLab workflows pack only (not Domino UI) |
-| `requirements_0.txt` | Python deps reference for Domino organize |
+Push to `dev` runs `run-tests-dev` (Harbor `development` tag). Push to `main`
+(when `config.toml` changes) publishes the versioned Harbor image.
 
-## Domino deployment
+---
 
-1. Connect this GitLab repo as a **Pieces Repository** in Domino.
-2. Wait for CI on `main` (after `config.toml` change) to build Harbor images.
-3. Import **`sus_onedata.customization`** in the Domino workflow editor (not `.json`). Regenerate after edits:
-   `python scripts/sync_onedata_customization.py`
-   Set workflow **Secrets** (optional if using code defaults):
-   - `onedata_onezone_host` — e.g. `data.spice-platform.eu`
-   - `onedata_token` — your OneData access token (not stored in git)
-   - `onedata_output_dir` — e.g. `onedata:///YourSpace/run`
-4. Seed static inputs on OneData under `inputs/` (load, prices, scenario, etc.) before the first run.
+# Sustainable Model Domino Workflow (legacy local scripts)
 
-## GitLab CI / Harbor
+Workflow combines:
+
+- load ingest, preprocessing, training, prediction, and model monitoring,
+- MRK + PV + battery sizing and simulation,
+- investment and dashboard outputs,
+- sustainable refresh flow with incremental training, horizon forecasting, and anomaly alerts.
+
+## Local setup
+
+Install runtime dependencies:
+
+```text
+pip install -r requirements_0.txt
+```
+
+Main entrypoints:
+
+```text
+python run_workflow.py
+python run_workflow.py --phase investment
+python run_workflow.py --phase sustainable --horizon-hours 72
+python -m streamlit run scripts/streamlit_dashboard.py
+python -m streamlit run scripts/streamlit_web_input.py
+```
+
+PowerShell helpers:
+
+```text
+.\run_live_dashboard.ps1
+.\run_web_input.ps1
+```
+
+## Main outputs
+
+- `tests/SimulatePiece_Outputs/mrk_savings_report.json`
+- `tests/KPIPiece_Outputs/kpi_results.csv`
+- `tests/InvestmentEvalPiece_Outputs/investment_evaluation.csv`
+- `tests/DashboardPiece_Outputs/dashboard_data.json`
+- `tests/dashboard_data.json`
+- `tests/sustainable/outputs/forecast_by_department.csv`
+- `tests/AnomalyAlertPiece_Outputs/anomaly_alerts.csv`
+
+## Tests
+
+```text
+pip install -r requirements-tests.txt
+pytest
+```
+
+## Domino
+
+Domino metadata is tracked in:
+
+- `.domino/compiled_metadata.json`
+- `.domino/dependencies_map.json`
+
+The repository is intended to expose the full sustainable workflow piece set, with workflow logic kept directly inside real piece folders.
+
+## SPICE GitLab CI / Harbor
 
 Pipeline builds and publishes piece images to Harbor on push to `main` when `config.toml` changes.
 
-Set these CI/CD variables (Settings → CI/CD → Variables). Mark secrets as **Masked**:
+Set these CI/CD variables in GitLab (Settings → CI/CD → Variables). Mark secrets as **Masked**:
 
 | Variable | Description |
 |----------|-------------|
@@ -44,5 +89,30 @@ Set these CI/CD variables (Settings → CI/CD → Variables). Mark secrets as **
 | `CONTAINER_REGISTRY` | `harbor.testbed.spice-platform.eu` |
 | `CONTAINER_REGISTRY_USERNAME` | Harbor user/robot (e.g. `partner`) |
 | `CONTAINER_REGISTRY_PASSWORD` | Harbor password from vault |
+| `ONEDATA_ACCESS_TOKEN` | OneData access token; consumed by the `-k onedata` pytest step |
 
-`config.toml` `REGISTRY_NAME` must use namespace `harbor.testbed.spice-platform.eu/partner/uc3`. `REPOSITORY_NAME` must be **lowercase** (Docker image tag rules).
+`config.toml` `REGISTRY_NAME` must use namespace `harbor.testbed.spice-platform.eu/partner/uc3`.
+
+## OneData integration (optional, opt-in)
+
+The boundary pieces can read inputs from / publish outputs to the SPICE OneData
+store via `fsspec` + `onedatarestfsspec`. The integration is **fully backward
+compatible**: with no OneData secrets and local paths, every piece behaves
+exactly as before.
+
+- **Shared layer:** `pieces/common/onedata_io.py` routes `onedata:///...` paths
+  through fsspec and local paths through pathlib/pandas (unchanged).
+- **Wired pieces:**
+  - `FetchEnergyDataPiece` – reads `load_csv` / `prices_csv` (local or `onedata:///...`).
+  - `SustainableIngestPiece` – reads/persists history + archives drops (local or `onedata:///...`).
+  - `DashboardPiece` – optional `publish_to` (`onedata:///...`) also copies the final dashboard JSON to OneData.
+- **Secrets:** each wired piece declares an optional `SecretsModel`
+  (`onedata_onezone_host`, `onedata_token`). In Domino, configure them as piece
+  secrets; locally they are unset, so the local filesystem is used. The token is
+  never stored in code or `config.toml`.
+- **Tests:** `tests/test_fetch_piece_onedata.py` runs a real OneData round-trip;
+  it is selected by `pytest -k onedata` and auto-skips unless
+  `ONEDATA_ONEZONE_HOST` + `ONEDATA_TOKEN` are set. Local fallback coverage lives
+  in `tests/test_io_layer_local.py` (runs in the normal job).
+
+Onezone host: `data.spice-platform.eu`.

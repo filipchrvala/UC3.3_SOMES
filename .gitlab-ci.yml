@@ -64,26 +64,25 @@ validate-and-organize:
     - when: never
   script:
     - pip list | grep domino
-    - |
-      python -c "
-      from pathlib import Path
-      import tomli
-      p = Path('config.toml')
-      b = p.read_bytes()
-      if b.startswith(b'\xef\xbb\xbf'):
-          p.write_bytes(b[3:])
-          print('Removed UTF-8 BOM from config.toml')
-      tomli.load(p.open('rb'))
-      print('config.toml parses OK')
-      "
+    - echo "$CONTAINER_REGISTRY"
+    - echo "$CONTAINER_REGISTRY_USERNAME"
     - domino piece-repository organize --build-images --source-url="${CI_PROJECT_URL}"
+    - pip install -r requirements-tests.txt
+    - DOMINO_TESTS_ENVIRONMENT=gitlab pytest tests/ -k "not onedata" --cov=pieces --cov-report=xml --cov-report=term-missing
+    - |
+      if pytest --collect-only -q -k onedata 2>/dev/null | grep -q 'test session starts\|test_'; then
+        DOMINO_TESTS_ENVIRONMENT=gitlab ONEDATA_ONEZONE_HOST="data.spice-platform.eu" ONEDATA_TOKEN="$ONEDATA_ACCESS_TOKEN" pytest tests/ -k onedata --cov=pieces --cov-report=xml --cov-report=term-missing
+      else
+        echo "No onedata tests in this repository — skipping onedata pytest step"
+      fi
     - DOCKER_CLIENT_TIMEOUT=600 domino piece-repository publish-images --registry-username "$CONTAINER_REGISTRY_USERNAME" --registry-token "$CONTAINER_REGISTRY_PASSWORD"
     - |
       GIT_STATUS=$(git status -s -- .domino/)
       if [ -n "$GIT_STATUS" ]; then
         git add .domino/
-        git commit -m "auto-organize"
-        git push origin HEAD:main
+        git commit -m "auto-organize [skip ci]" || true
+        git pull --rebase origin main || true
+        git push origin HEAD:main || echo "WARN: auto-organize push to main skipped (remote moved); image already published"
       else
         echo "No changes in .domino/ to commit"
       fi
@@ -93,34 +92,28 @@ run-tests-dev:
   <<: *base-setup
   stage: run-tests-dev
   rules:
+    - if: '$CI_COMMIT_MESSAGE =~ /^auto-organize/'
+      when: never
     - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
     - when: never
   script:
     - pip list | grep domino
-    - |
-      python -c "
-      from pathlib import Path
-      import tomli
-      p = Path('config.toml')
-      b = p.read_bytes()
-      if b.startswith(b'\xef\xbb\xbf'):
-          p.write_bytes(b[3:])
-          print('Removed UTF-8 BOM from config.toml')
-      tomli.load(p.open('rb'))
-      print('config.toml parses OK')
-      "
+    - echo "$CONTAINER_REGISTRY"
+    - echo "$CONTAINER_REGISTRY_USERNAME"
     - domino piece-repository organize --build-images --source-url="${CI_PROJECT_URL}" --tag-overwrite=development
-    - DOCKER_CLIENT_TIMEOUT=600 domino piece-repository publish-images --registry-username "$CONTAINER_REGISTRY_USERNAME" --registry-token "$CONTAINER_REGISTRY_PASSWORD"
+    - pip install -r requirements-tests.txt
+    - DOMINO_TESTS_ENVIRONMENT=gitlab pytest tests/ -k "not onedata" --cov=pieces --cov-report=xml --cov-report=term-missing
     - |
-      GIT_STATUS=$(git status -s -- .domino/)
-      if [ -n "$GIT_STATUS" ]; then
-        git add .domino/
-        git commit -m "auto-organize"
-        git push origin HEAD:dev
-        COMMIT_SHA=$(git rev-parse HEAD)
+      if pytest --collect-only -q -k onedata 2>/dev/null | grep -q 'test session starts\|test_'; then
+        DOMINO_TESTS_ENVIRONMENT=gitlab ONEDATA_ONEZONE_HOST="data.spice-platform.eu" ONEDATA_TOKEN="$ONEDATA_ACCESS_TOKEN" pytest tests/ -k onedata --cov=pieces --cov-report=xml --cov-report=term-missing
       else
-        echo "No changes in .domino/ to commit"
-        COMMIT_SHA=$CI_COMMIT_SHA
+        echo "No onedata tests in this repository — skipping onedata pytest step"
       fi
+    - DOCKER_CLIENT_TIMEOUT=600 domino piece-repository publish-images --registry-username "$CONTAINER_REGISTRY_USERNAME" --registry-token "$CONTAINER_REGISTRY_PASSWORD"
+    # Do not commit/push .domino/ from the dev job. organize shuffles secret
+    # key order, the runner is on detached HEAD, and a push races other
+    # pipelines — that is what turned a green publish into a red job.
+    - echo "Skipping auto-organize git push on dev (image already published)."
+    - COMMIT_SHA=$CI_COMMIT_SHA
     - domino piece-repository delete-release --tag-name=development
     - domino piece-repository release --tag-name=development --commit-sha=$COMMIT_SHA

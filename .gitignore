@@ -1,4 +1,12 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-seed_inputs/
+tests/**/*_Outputs/
+tests/**/*_Output/
+tests/_generated/
+tests/_staging/
+tests/_presentation/
+tests/sustainable/model_registry/*.pkl
+tests/**/*.parquet
+tests/**/*.pkl
+tests/dashboard_data.json

@@ -1,10 +1,9 @@
-from typing import Optional
+from pydantic import BaseModel, Field
 
 try:
     from common.onedata_models import OneDataSecretsModel, RunIdInputMixin
 except ModuleNotFoundError:
     from pieces.common.onedata_models import OneDataSecretsModel, RunIdInputMixin
-
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,8 +23,8 @@ class SecretsModel(OneDataSecretsModel):
     pass
 
 
-
 class OutputModel(BaseModel):
+    run_id: str = Field(default="", description="OneData run folder id")
     message: str
     models_index_json: str
     training_summary_json: str

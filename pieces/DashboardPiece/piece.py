@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+try:
+    from common import onedata_io as od
+except ModuleNotFoundError:
+    try:
+        from pieces.common import onedata_io as od
+    except ModuleNotFoundError:
+        od = None
+
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,49 +24,44 @@ try:
 except ImportError:
     from .models import METRIC_HELP, InputModel, OutputModel
 
-# Optional shared OneData I/O layer (used only to publish the final JSON).
-try:
-    from common import onedata_io as od
-except ModuleNotFoundError:
-    try:
-        from pieces.common import onedata_io as od
-    except ModuleNotFoundError:
-        od = None
-
-
-def _read_optional_csv(path: Path | None) -> pd.DataFrame:
-    if path is None or not path.is_file():
-        return pd.DataFrame()
-    try:
-        return pd.read_csv(path)
-    except pd.errors.EmptyDataError:
-        return pd.DataFrame()
-
 
 def render_kpi_metric(column, label: str, value: str, help_key: str, *, widget_key: str) -> None:
-    """Metrika s tooltipom (bez samostatného tlačidla ?)."""
+    """Metrika s viditeľným tlačidlom ? (popover) — help= pri st.metric býva málo viditeľné."""
     import streamlit as st
 
     text = METRIC_HELP.get(help_key, "")
     column.metric(label, value, help=text or None)
+    if text:
+        with column.popover("?", help="Vysvetlenie ukazovateľa", key=f"kpi_pop_{widget_key}"):
+            st.markdown(text)
 
 
 class DashboardPiece(BasePiece):
-    """Build finance-focused dashboard payload for CFO decisions."""
+    """Build SoMES operational dashboard (investment KPIs only as SEED appendix)."""
 
     def piece_function(self, input_data: InputModel, secrets_data=None) -> OutputModel:
         _stage = None
-        _piece_out = None
         _run_id = None
         if od is not None:
             input_data, _stage = od.stage_inputs(input_data, secrets_data)
-            _run_id = od.resolve_run_id(input_data, secrets_data, generate=False)
-        rep_path = Path(input_data.report_json)
-        kpi_path = Path(input_data.kpi_results_csv)
-        inv_path = Path(input_data.investment_evaluation_csv)
+            _run_id = od.resolve_run_id(
+                input_data, secrets_data, generate=False, results_path=getattr(self, "results_path", None)
+            )
+            if hasattr(input_data, "run_id") and _run_id and not getattr(input_data, "run_id", ""):
+                try:
+                    input_data.run_id = _run_id
+                except Exception:
+                    pass
+        rep_path = Path(input_data.report_json) if input_data.report_json else None
+        kpi_path = Path(input_data.kpi_results_csv) if input_data.kpi_results_csv else None
+        inv_path = Path(input_data.investment_evaluation_csv) if input_data.investment_evaluation_csv else None
         alerts_path = Path(input_data.anomaly_alerts_csv) if input_data.anomaly_alerts_csv else None
         drift_path = Path(input_data.drift_report_json) if input_data.drift_report_json else None
-        out_dir = Path(self.results_path or rep_path.parent)
+        dispatch_path = Path(input_data.next_day_dispatch_plan_csv) if input_data.next_day_dispatch_plan_csv else None
+        out_dir = Path(
+            self.results_path
+            or (dispatch_path.parent if dispatch_path else (rep_path.parent if rep_path else Path(".")))
+        )
         out_dir.mkdir(parents=True, exist_ok=True)
         log_path = out_dir / "dashboard.log"
 
@@ -73,11 +76,97 @@ class DashboardPiece(BasePiece):
         _log(f"Input investment_evaluation_csv={inv_path}")
         _log(f"Input anomaly_alerts_csv={alerts_path}")
         _log(f"Input drift_report_json={drift_path}")
-        if not rep_path.is_file():
+        _log(f"Input next_day_dispatch_plan_csv={dispatch_path}")
+
+        # Prefer operational SoMES dashboard when dispatch plan is available.
+        if dispatch_path and dispatch_path.is_file():
+            import sys
+
+            repo_root = Path(__file__).resolve().parents[2]
+            if str(repo_root) not in sys.path:
+                sys.path.insert(0, str(repo_root))
+            from pieces.common_somes.architecture import build_ops_dashboard, write_json
+
+            plan = pd.read_csv(dispatch_path, parse_dates=["datetime"])
+            kpis = {}
+            if input_data.operational_kpis_json and Path(input_data.operational_kpis_json).is_file():
+                kpis = json.loads(Path(input_data.operational_kpis_json).read_text(encoding="utf-8"))
+            validation = {}
+            if input_data.technical_validation_json and Path(input_data.technical_validation_json).is_file():
+                validation = json.loads(Path(input_data.technical_validation_json).read_text(encoding="utf-8"))
+            alerts_block = {"summary": {"total": 0, "critical": 0, "warning": 0, "info": 0}, "latest": [], "drift": {}}
+            if alerts_path and alerts_path.is_file():
+                try:
+                    alerts_df = pd.read_csv(alerts_path)
+                except pd.errors.EmptyDataError:
+                    alerts_df = pd.DataFrame()
+                if not alerts_df.empty:
+                    sev = alerts_df.get("severity", pd.Series([], dtype=str)).astype(str).str.lower()
+                    alerts_block["summary"] = {
+                        "total": int(len(alerts_df)),
+                        "critical": int((sev == "critical").sum()),
+                        "warning": int((sev == "warning").sum()),
+                        "info": int((sev == "info").sum()),
+                    }
+            if drift_path and drift_path.is_file():
+                alerts_block["drift"] = json.loads(drift_path.read_text(encoding="utf-8"))
+            seed_appendix = {
+                "note": "Investment CAPEX/NPV/payback belongs to UC3.2 SEED.",
+                "delegate_to": "UC3.2_SEED",
+            }
+            if inv_path and inv_path.is_file():
+                inv_df = pd.read_csv(inv_path)
+                seed_appendix["investment_evaluation_preview"] = (inv_df.to_dict(orient="records") or [{}])[0]
+            feedback = {}
+            if input_data.forecast_vs_actual_json and Path(input_data.forecast_vs_actual_json).is_file():
+                feedback = json.loads(Path(input_data.forecast_vs_actual_json).read_text(encoding="utf-8"))
+            data_quality = {}
+            if input_data.data_quality_report_json and Path(input_data.data_quality_report_json).is_file():
+                dq = json.loads(Path(input_data.data_quality_report_json).read_text(encoding="utf-8"))
+                data_quality = {
+                    "overall_severity": dq.get("overall_severity"),
+                    "validated": dq.get("validated"),
+                    "datasets": list((dq.get("datasets") or {}).keys()),
+                    "recommendations": (dq.get("correction_recommendations") or [])[:10],
+                }
+            payload = build_ops_dashboard(
+                next_day_plan=plan,
+                operational_kpis=kpis,
+                technical_validation=validation,
+                alerts_summary=alerts_block,
+                forecast_vs_actual=feedback,
+                seed_appendix=seed_appendix,
+                data_quality=data_quality,
+            )
+            out_json = write_json(out_dir / "dashboard_data.json", payload)
+            _log(f"Wrote operational dashboard {out_json}")
+            try:
+                from .html_report import write_ops_dashboard_html
+            except ImportError:
+                from pieces.DashboardPiece.html_report import write_ops_dashboard_html
+
+            out_html = write_ops_dashboard_html(out_dir / "dashboard.html", payload)
+            _log(f"Wrote operational dashboard HTML {out_html}")
+            self.display_result = {"file_type": "html", "file_path": str(out_html)}
+            _piece_out = OutputModel(dashboard_data_json=str(out_json))
+            if od is not None:
+                if hasattr(_piece_out, 'run_id') and _run_id and not getattr(_piece_out, 'run_id', ''):
+                    try:
+                        _piece_out.run_id = _run_id
+                    except Exception:
+                        pass
+                return od.finish_piece(
+                    _piece_out, self.results_path, secrets_data, "DashboardPiece", _stage, run_id=_run_id
+                )
+            if _stage is not None:
+                _stage.cleanup()
+            return _piece_out
+
+        if not rep_path or not rep_path.is_file():
             raise FileNotFoundError(f"Report JSON not found: {rep_path}")
-        if not kpi_path.is_file():
+        if not kpi_path or not kpi_path.is_file():
             raise FileNotFoundError(f"KPI CSV not found: {kpi_path}")
-        if not inv_path.is_file():
+        if not inv_path or not inv_path.is_file():
             raise FileNotFoundError(f"Investment CSV not found: {inv_path}")
 
         try:
@@ -121,7 +210,10 @@ class DashboardPiece(BasePiece):
                 "drift": {},
             }
             if alerts_path and alerts_path.is_file():
-                alerts_df = _read_optional_csv(alerts_path)
+                try:
+                    alerts_df = pd.read_csv(alerts_path)
+                except pd.errors.EmptyDataError:
+                    alerts_df = pd.DataFrame()
                 if not alerts_df.empty:
                     sev = alerts_df.get("severity", pd.Series([], dtype=str)).astype(str).str.lower()
                     alerts_block["summary"] = {
@@ -182,33 +274,27 @@ class DashboardPiece(BasePiece):
             }
 
             out_json = out_dir / "dashboard_data.json"
-            payload_text = json.dumps(payload, indent=2, ensure_ascii=False)
-            out_json.write_text(payload_text, encoding="utf-8")
+            out_json.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
             _log(f"Wrote dashboard JSON: {out_json}; kpi_rows={len(kpi_df)}")
-
-            # Optional: also publish the final JSON to OneData. Purely additive —
-            # only runs when a target is given AND OneData secrets are present.
-            publish_to = getattr(input_data, "publish_to", None)
-            if publish_to and od is not None and od.configure_onedata(secrets_data, force=True):
-                try:
-                    od.write_text(publish_to, payload_text)
-                    _log(f"Published dashboard JSON to OneData: {publish_to}")
-                except Exception as pub_exc:
-                    _log(f"WARNING: OneData publish failed ({publish_to}): {pub_exc}")
-
+            # Domino result pane: show JSON as downloadable text when ops HTML is unavailable.
+            self.display_result = {"file_type": "txt", "file_path": str(out_json)}
             _piece_out = OutputModel(dashboard_data_json=str(out_json))
+            if od is not None:
+                if hasattr(_piece_out, 'run_id') and _run_id and not getattr(_piece_out, 'run_id', ''):
+                    try:
+                        _piece_out.run_id = _run_id
+                    except Exception:
+                        pass
+                return od.finish_piece(
+                    _piece_out, self.results_path, secrets_data, "DashboardPiece", _stage, run_id=_run_id
+                )
+            if _stage is not None:
+                _stage.cleanup()
+            return _piece_out
         except Exception as exc:
             (out_dir / "dashboard_error.txt").write_text(traceback.format_exc(), encoding="utf-8")
             _log(f"ERROR during dashboard assembly: {exc}")
             raise
-        finally:
-            if od is not None and _piece_out is None:
-                od.cleanup_on_error(self.results_path, secrets_data, "DashboardPiece", _stage, run_id=_run_id)
-            elif _stage is not None:
-                _stage.cleanup()
-        if od is not None and _piece_out is not None:
-            return od.finish_piece(_piece_out, self.results_path, secrets_data, "DashboardPiece", _stage, run_id=_run_id)
-        return _piece_out
 
 
 # --- sizing grid UI ---
@@ -268,7 +354,7 @@ def render_sizing_grid_section(
         "Vybrať variant z mriežky",
         options=list(range(len(df))),
         format_func=lambda i: labels[int(i)],
-        help=METRIC_HELP["grid_pick"],
+        help=METRIC_HELP.get("grid_pick"),
     )
     sel = df.iloc[int(pick)]
     c1, c2, c3, c4 = st.columns(4)
@@ -463,6 +549,89 @@ METRIC_LABELS = {
 }
 
 
+def _fmt_metric(val, *, suffix: str = "") -> str:
+    if val is None:
+        return "—"
+    try:
+        return f"{float(val):.2f}{suffix}"
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _render_forecast_quality(feedback: dict) -> None:
+    """Show MAE/RMSE for load (consumption) and PV (production) forecasts."""
+    if not feedback:
+        return
+    load = feedback.get("load_forecast") or {}
+    pv = feedback.get("pv_forecast") or {}
+    # EvaluateML-style nested overall metrics
+    if isinstance(pv.get("overall"), dict):
+        pv_overall = pv["overall"]
+    else:
+        pv_overall = pv
+
+    st.subheader("Kvalita predikcie (MAE / RMSE)")
+    st.caption("Spotreba z ModelMonitoring (Predict vs actual). Výroba FVE z overlapping forecast vs meranie alebo vs PVOUT v tréningových dátach.")
+
+    c1, c2, c3 = st.columns(3)
+    render_kpi_metric(
+        c1,
+        "Spotreba MAE (kW)",
+        _fmt_metric(load.get("mae")),
+        "load_mae",
+        widget_key="fq_load_mae",
+    )
+    render_kpi_metric(
+        c2,
+        "Spotreba RMSE (kW)",
+        _fmt_metric(load.get("rmse")),
+        "load_rmse",
+        widget_key="fq_load_rmse",
+    )
+    render_kpi_metric(
+        c3,
+        "Spotreba MAPE",
+        _fmt_metric(load.get("mape_pct"), suffix=" %"),
+        "load_mape",
+        widget_key="fq_load_mape",
+    )
+
+    p1, p2, p3 = st.columns(3)
+    render_kpi_metric(
+        p1,
+        "Výroba MAE",
+        _fmt_metric(pv_overall.get("mae")),
+        "pv_mae",
+        widget_key="fq_pv_mae",
+    )
+    render_kpi_metric(
+        p2,
+        "Výroba RMSE",
+        _fmt_metric(pv_overall.get("rmse")),
+        "pv_rmse",
+        widget_key="fq_pv_rmse",
+    )
+    render_kpi_metric(
+        p3,
+        "Výroba MAPE",
+        _fmt_metric(pv_overall.get("mape_pct"), suffix=" %"),
+        "pv_mape",
+        widget_key="fq_pv_mape",
+    )
+
+    if load.get("available") is False:
+        st.info("Spotreba: metriky nie sú k dispozícii (chýba actual load v predictions).")
+    if pv.get("available") is False:
+        reason = pv.get("reason") or "výrobné metriky nie sú k dispozícii"
+        st.warning(f"Výroba FVE: {reason}")
+
+    actions = feedback.get("recommended_actions") or []
+    if actions:
+        st.markdown("**Odporúčané akcie**")
+        for a in actions:
+            st.write(f"- {a}")
+
+
 def render_timeseries_dashboard(payload: dict) -> None:
     """Renders the original financial/time-series dashboard from DashboardPiece JSON."""
     if not payload:
@@ -538,6 +707,8 @@ def render_timeseries_dashboard(payload: dict) -> None:
                 chart_df[name] = s.get("values") or []
             fig = px.line(chart_df, x="datetime", y=[c for c in chart_df.columns if c != "datetime"])
             st.plotly_chart(fig, use_container_width=True)
+
+        _render_forecast_quality(payload.get("forecast_vs_actual") or {})
         return
 
     preprocess_df = _records_to_df(datasets.get("preprocess_predict", []))
@@ -554,7 +725,7 @@ def render_timeseries_dashboard(payload: dict) -> None:
         "Scenár",
         scenario_options,
         index=scenario_options.index(default_scenario) if default_scenario in scenario_options else 0,
-        help=METRIC_HELP["scenario_select"],
+        help=METRIC_HELP.get("scenario_select"),
     )
 
     st.subheader("Solar PV & battery (scenario)")
@@ -974,6 +1145,9 @@ def load_unified_payload() -> dict | None:
 
 
 def get_timeseries_payload(raw: dict, *, allow_fallback: bool) -> dict | None:
+    # Operational SoMES dashboard is stored at the top level.
+    if isinstance(raw, dict) and raw.get("format") == "somes_ops_dashboard_v1":
+        return raw
     ts = raw.get("timeseries")
     if isinstance(ts, dict) and (
         ts.get("datasets") is not None
@@ -981,6 +1155,7 @@ def get_timeseries_payload(raw: dict, *, allow_fallback: bool) -> dict | None:
         or ts.get("alerts_and_drift") is not None
         or ts.get("single_chart") is not None
         or ts.get("decision_kpis") is not None
+        or ts.get("forecast_vs_actual") is not None
     ):
         return ts
     if allow_fallback and TS_FALLBACK.is_file():
@@ -1049,6 +1224,7 @@ def render_unified_dashboard() -> bool:
     gen = raw.get("generated_at_utc")
     if gen:
         st.caption(f"Posledná aktualizácia (UTC): **{gen}**")
+    st.caption("Pod každou metrikou je tlačidlo **?** — kliknutím zobrazíte slovenské vysvetlenie.")
     with st.expander("Slovník ukazovateľov", expanded=False):
         _glossary = (
             ("Úspora (obdobie)", "savings_period"),
@@ -1059,7 +1235,7 @@ def render_unified_dashboard() -> bool:
         )
         for title, key in _glossary:
             st.markdown(f"**{title}**")
-            st.caption(METRIC_HELP.get(key, "—"))
+            st.caption(METRIC_HELP.get(key, ""))
 
     if raw.get("format") == "alternate_unified_v1":
         inv = raw.get("investment")

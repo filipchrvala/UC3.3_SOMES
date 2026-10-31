@@ -1,0 +1,200 @@
+{
+  "format": "workflow_user_input_v1",
+  "project_options": {
+    "include_solar_pv": true,
+    "include_battery": true
+  },
+  "UserInputPiece": {
+    "constraints": {
+      "site_name": "Pitonak plant",
+      "site": {
+        "latitude": 48.17,
+        "longitude": 17.07,
+        "country": "SK"
+      },
+      "installation": {
+        "mount_type": "roof",
+        "roof_shape": "pitched",
+        "roof_tilt_deg": 15,
+        "orientation_deg": 180,
+        "shading": "low",
+        "priority": "balanced",
+        "allow_bifacial": true,
+        "notes": ""
+      },
+      "target_payback_years": 9.0,
+      "max_roof_area_m2": 3500.0,
+      "max_ground_area_m2": 0,
+      "max_battery_area_m2": 250.0,
+      "annual_load_mwh": 1420.442,
+      "min_pv_kwp": 300.0,
+      "roof_load_limit_kg_per_m2": 120,
+      "max_capex_eur": 800000.0,
+      "search": {
+        "kwp_step": 50,
+        "kwh_step": 100,
+        "kwp_min": 0,
+        "kwh_min": 0
+      },
+      "annual_load_mwh_from": "csv"
+    },
+    "economics": {
+      "currency": "EUR",
+      "solar": {
+        "eur_per_kwp": 780.0,
+        "yield_kwh_per_kwp_year": 1020.0,
+        "self_consumption_base": 0.45,
+        "pv_module_selection_mode": "auto",
+        "pv_module_selection": "max_power_wp",
+        "pv_module_reference_wp": 300,
+        "panel_selection_weights": {
+          "power_density": 0.22,
+          "economics": 0.18,
+          "shading_robustness": 0.18,
+          "weight_compliance": 0.14,
+          "bifacial_fit": 0.12,
+          "efficiency": 0.16
+        }
+      },
+      "battery": {
+        "eur_per_kwh": 420.0,
+        "peak_shaving_value_eur_per_kwh_year": 25.0
+      },
+      "electricity": {
+        "price_sensitivity_pct": 10,
+        "price_eur_per_kwh": 0.118624
+      },
+      "finance": {
+        "discount_rate": 0.09,
+        "analysis_years": 12,
+        "degradation_solar_per_year": 0.005
+      },
+      "emissions": {
+        "kg_co2_per_kwh_grid": 0.57
+      },
+      "layout": {
+        "kwp_per_m2_roof": 0.18,
+        "kwh_per_m2_battery_area": 2.5,
+        "roof_additional_load_kg_per_m2_max": 25
+      }
+    }
+  },
+  "SolarSimPiece": {
+    "solar_config": {
+      "tilt": 15,
+      "azimuth": 180,
+      "site_latitude": 48.17,
+      "site_longitude": 17.07,
+      "efficiency": 0.9,
+      "capacity_kWp": 400.0,
+      "temp_coeff": -0.004,
+      "site_altitude": 200,
+      "module_name": "Canadian_Solar_CS6X_300M__2013_",
+      "inverter_name": "ABB__MICRO_0_25_I_OUTD_US_208__208V_"
+    }
+  },
+  "InvestmentEvalPiece": {
+    "analysis_years": 12,
+    "discount_rate": 0.09,
+    "degradation_per_year": 0.005,
+    "solar_capex_eur": 312000.0,
+    "battery_capex_eur": 252000.0
+  },
+  "BatterySimPiece": {
+    "scenario": {
+      "scenario_id": "pitonak_sustainable",
+      "description": "Pitonak MRK configuration",
+      "timezone": "Europe/Bratislava",
+      "timestep_minutes": 15,
+      "use_pv": true,
+      "use_battery": true,
+      "equipment": {
+        "selection_mode": "auto",
+        "system_scope": "pv_and_battery",
+        "constraints": {
+          "max_roof_area_m2": 3500,
+          "max_battery_area_m2": 250,
+          "max_capex_eur": 800000,
+          "installation": {
+            "mount_type": "roof",
+            "shading": "low",
+            "priority": "balanced",
+            "allow_bifacial": true
+          }
+        },
+        "layout": {
+          "kwp_per_m2_roof": 0.18,
+          "kwh_per_m2_battery_area": 2.5
+        },
+        "auto": {
+          "objective": "max_npv",
+          "target_payback_years": 9,
+          "kwp_step": 50.0,
+          "kwh_step": 50.0,
+          "min_pv_kwp": 200.0,
+          "min_battery_kwh": 250.0,
+          "max_configurations": 200,
+          "require_pv": true,
+          "require_battery": true
+        }
+      },
+      "catalog": {
+        "sync_enabled": true,
+        "sources": {
+          "pv_modules_url": "https://raw.githubusercontent.com/NREL/SAM/patch/deploy/libraries/CEC%20Modules.csv",
+          "inverters_url": "https://raw.githubusercontent.com/NREL/SAM/develop/deploy/libraries/CEC%20Inverters.csv",
+          "battery_products_url": "https://solarequipment.energy.ca.gov/Home/DownloadtoExcel?filename=BatteryList"
+        }
+      },
+      "pv": {
+        "installed_kwp": 400,
+        "specific_capex_eur_per_kwp": 780,
+        "yield_kwh_per_kwp_year": 1020,
+        "tilt_deg": 15,
+        "azimuth_deg": 180,
+        "degradation_pct_per_year": 0.5,
+        "om_eur_per_kwp_year": 8
+      },
+      "solar": {
+        "capacity_kWp": 400.0
+      },
+      "battery": {
+        "energy_kwh": 600,
+        "capacity_kWh": 600,
+        "max_c_rate": 0.5,
+        "charge_efficiency": 0.95,
+        "discharge_efficiency": 0.95,
+        "initial_soc_pct": 45,
+        "specific_capex_eur_per_kwh": 420,
+        "max_equivalent_full_cycles_per_year": 450,
+        "calendar_life_years": 15,
+        "max_fraction_capacity_from_grid_charge": 0.72
+      },
+      "mrk": {
+        "contract_kw": 420,
+        "fee_eur_per_kw_month": 4.85,
+        "excess_peak_penalty_eur_per_kw": 32.0,
+        "rv_downsizing_safety_margin_pct": 8
+      },
+      "energy": {
+        "feed_in_surplus_eur_per_kwh": 0.052
+      },
+      "analysis": {
+        "amortization_years": 12,
+        "discount_rate": 0.09
+      },
+      "production": {
+        "strict_validation": false,
+        "min_sample_days": 7,
+        "max_missing_interval_share": 0.02
+      }
+    },
+    "battery_config": {
+      "charge_efficiency": 0.95,
+      "discharge_efficiency": 0.95,
+      "max_c_rate": 0.5,
+      "initial_soc": 45,
+      "capacity_kWh": 600.0
+    }
+  }
+}

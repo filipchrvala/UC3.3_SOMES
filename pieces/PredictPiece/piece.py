@@ -16,13 +16,18 @@ import yaml
 
 try:
     from common import onedata_io as od
-    from common.predictions_load import predictions_to_load_csv
 except ModuleNotFoundError:
     try:
         from pieces.common import onedata_io as od
-        from pieces.common.predictions_load import predictions_to_load_csv
     except ModuleNotFoundError:
         od = None
+
+try:
+    from common.predictions_load import predictions_to_load_csv
+except ModuleNotFoundError:
+    try:
+        from pieces.common.predictions_load import predictions_to_load_csv
+    except ModuleNotFoundError:
         predictions_to_load_csv = None
 
 
@@ -147,7 +152,11 @@ def _read_load_csv(path: Path) -> pd.DataFrame:
 
     df = raw.copy()
     dt_raw = df[dt_col].astype(str).str.strip()
-    dt = pd.to_datetime(dt_raw, format="%d.%m.%y %H:%M", errors="coerce")
+    # ISO first: with dayfirst=True pandas infers %Y-%d-%m from an ISO timestamp
+    # whose day is <= 12, which silently swaps day and month for the whole file.
+    dt = pd.to_datetime(dt_raw, format="ISO8601", errors="coerce")
+    if dt.isna().all():
+        dt = pd.to_datetime(dt_raw, format="%d.%m.%y %H:%M", errors="coerce")
     if dt.isna().all():
         dt = pd.to_datetime(dt_raw, dayfirst=True, errors="coerce")
     df["datetime"] = dt
@@ -197,7 +206,14 @@ def _generate_prediction_input_from_load(
     hours = future_dt.hour.values
     price = 0.07 + 0.035 * ((hours >= 7) & (hours <= 20))
     price = np.clip(price, 0.06, 0.15)
-    future_base = pd.DataFrame({"datetime": future_dt, "load_kw": 0.0, "price_eur_per_kwh": price})
+    future_base = pd.DataFrame(
+        {
+            "datetime": future_dt,
+            "load_kw": 0.0,
+            "price_eur_per_kwh": price,
+            "price_eur_kwh": price,
+        }
+    )
 
     parts: list[pd.DataFrame] = []
     for dept, group in load_all.groupby("department_id", sort=False):
@@ -212,6 +228,7 @@ def _generate_prediction_input_from_load(
             freq=freq,
         )
         bridge["price_eur_per_kwh"] = 0.085
+        bridge["price_eur_kwh"] = 0.085
         bridge["department_id"] = dept_id
 
         future = future_base.copy()
@@ -308,6 +325,14 @@ class PredictPiece(BasePiece):
             _run_id = od.resolve_run_id(input_data, secrets_data, generate=False)
             if _stage is not None and _stage.active:
                 od.fetch_sibling(_orig_model_path, input_data.model_path, "shift_profile.json")
+        elif any(
+            isinstance(v, str) and str(v).startswith("onedata:")
+            for v in (getattr(input_data, "load_csv", None), getattr(input_data, "model_path", None))
+        ):
+            raise RuntimeError(
+                "OneData paths given but onedata_io failed to import "
+                "(check pieces/common; predictions_load must not block od import)."
+            )
         _piece_out = None
         results_dir = Path(self.results_path or ".")
         results_dir.mkdir(parents=True, exist_ok=True)
@@ -320,8 +345,10 @@ class PredictPiece(BasePiece):
 
             model_path = Path(input_data.model_path)
             load_path = Path(input_data.load_csv)
-            if not load_path.is_file():
-                raise FileNotFoundError(f"Load CSV not found: {load_path}")
+            if str(load_path).startswith("onedata:") or not load_path.is_file():
+                raise FileNotFoundError(
+                    f"Load CSV not found (staging may have failed): {load_path}"
+                )
             prediction_days, timestep_minutes = _resolve_prediction_horizon(input_data, load_path)
             print(
                 f"[INFO] Prediction horizon: {prediction_days} days "
@@ -502,6 +529,8 @@ class PredictPiece(BasePiece):
             if "price_eur_kwh" in feature_names:
                 if "price_eur_kwh" in df.columns:
                     row["price_eur_kwh"] = float(df.iloc[i]["price_eur_kwh"])
+                elif "price_eur_per_kwh" in df.columns:
+                    row["price_eur_kwh"] = float(df.iloc[i]["price_eur_per_kwh"])
                 elif "price_eur_mwh" in df.columns:
                     row["price_eur_kwh"] = float(df.iloc[i]["price_eur_mwh"]) / 1000.0
                 else:

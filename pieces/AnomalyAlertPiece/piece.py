@@ -179,7 +179,11 @@ class AnomalyAlertPiece(BasePiece):
             out_dir.mkdir(parents=True, exist_ok=True)
             out_path = out_dir / "anomaly_alerts.csv"
             drift_path = out_dir / "drift_report.json"
-            pd.DataFrame(alerts).to_csv(out_path, index=False)
+            _alert_cols = [
+                "datetime", "department_id", "severity", "reason",
+                "actual_kw", "expected_kw", "delta_kw", "robust_z",
+            ]
+            pd.DataFrame(alerts, columns=_alert_cols).to_csv(out_path, index=False)
             drift_summary = {
                 "departments": drift_rows,
                 "critical_count": int(sum(1 for r in drift_rows if r["state"] == "critical")),
