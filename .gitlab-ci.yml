@@ -80,7 +80,7 @@ validate-and-organize:
       GIT_STATUS=$(git status -s -- .domino/)
       if [ -n "$GIT_STATUS" ]; then
         git add .domino/
-        git commit -m "auto-organize"
+        git commit -m "auto-organize [skip ci]"
         git push origin HEAD:main
       else
         echo "No changes in .domino/ to commit"
@@ -91,6 +91,8 @@ run-tests-dev:
   <<: *base-setup
   stage: run-tests-dev
   rules:
+    - if: '$CI_COMMIT_MESSAGE =~ /auto-organize/'
+      when: never
     - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
     - when: never
   script:
@@ -111,7 +113,7 @@ run-tests-dev:
       GIT_STATUS=$(git status -s -- .domino/)
       if [ -n "$GIT_STATUS" ]; then
         git add .domino/
-        git commit -m "auto-organize"
+        git commit -m "auto-organize [skip ci]"
         git push origin HEAD:dev
         COMMIT_SHA=$(git rev-parse HEAD)
       else
