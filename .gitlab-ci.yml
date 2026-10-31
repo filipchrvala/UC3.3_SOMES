@@ -80,8 +80,9 @@ validate-and-organize:
       GIT_STATUS=$(git status -s -- .domino/)
       if [ -n "$GIT_STATUS" ]; then
         git add .domino/
-        git commit -m "auto-organize [skip ci]"
-        git push origin HEAD:main
+        git commit -m "auto-organize [skip ci]" || true
+        git pull --rebase origin main || true
+        git push origin HEAD:main || echo "WARN: auto-organize push to main skipped (remote moved); image already published"
       else
         echo "No changes in .domino/ to commit"
       fi
@@ -109,16 +110,10 @@ run-tests-dev:
         echo "No onedata tests in this repository — skipping onedata pytest step"
       fi
     - DOCKER_CLIENT_TIMEOUT=600 domino piece-repository publish-images --registry-username "$CONTAINER_REGISTRY_USERNAME" --registry-token "$CONTAINER_REGISTRY_PASSWORD"
-    - |
-      GIT_STATUS=$(git status -s -- .domino/)
-      if [ -n "$GIT_STATUS" ]; then
-        git add .domino/
-        git commit -m "auto-organize [skip ci]"
-        git push origin HEAD:dev
-        COMMIT_SHA=$(git rev-parse HEAD)
-      else
-        echo "No changes in .domino/ to commit"
-        COMMIT_SHA=$CI_COMMIT_SHA
-      fi
+    # Do not commit/push .domino/ from the dev job. organize shuffles secret
+    # key order, the runner is on detached HEAD, and a push races other
+    # pipelines — that is what turned a green publish into a red job.
+    - echo "Skipping auto-organize git push on dev (image already published)."
+    - COMMIT_SHA=$CI_COMMIT_SHA
     - domino piece-repository delete-release --tag-name=development
     - domino piece-repository release --tag-name=development --commit-sha=$COMMIT_SHA
