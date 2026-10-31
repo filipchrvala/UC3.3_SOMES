@@ -92,7 +92,7 @@ run-tests-dev:
   <<: *base-setup
   stage: run-tests-dev
   rules:
-    - if: '$CI_COMMIT_MESSAGE =~ /auto-organize/'
+    - if: '$CI_COMMIT_MESSAGE =~ /^auto-organize/'
       when: never
     - if: '$CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"'
     - when: never
